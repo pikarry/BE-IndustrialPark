@@ -1,0 +1,50 @@
+name: backend-cicd
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.jss ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: npm install
+        run: npm install
+      - name: start pm2
+        run: |
+          npm install -g pm2
+          pm2 start ecosystem.config.js
+        env:
+          CI: true
+  depoly:
+    needs: [build]
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: SSH deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          password: ${{ secrets.PASSWORD }}
+          port: ${{ secrets.PORT }}
+          script: |
+            curl -o-   https://raw.githubusercontent.com/creationix/nvm/v0.33.8/install.sh    | bash
+              . ~/.nvm/nvm.sh
+            npm install -g pm2
+            cd /var/www/industrial/industrial-park-management-backend/
+            git pull origin master
+            npm i
+            pm2 start ecosystem.config.js
